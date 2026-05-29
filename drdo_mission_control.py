@@ -6,196 +6,209 @@ import random
 
 class DRDOMissionControlApp:
     def __init__(self):
-        # Screen Dimensions Matrix
-        self.width, self.height = 1024, 768
+        # Layout Framework Matrix (Fixed Resolution Match)
+        self.width, self.height = 1280, 720
         self.fps = 0.0
         self.last_time = time.time()
 
-        # Mission Operational States
-        self.system_status = "SCANNING TACTICAL AIRSPACE"
-        self.hud_color = (0, 255, 0)       # Tactical Defensive Green
-        self.ew_mode = 1                  # 1: Phased Radar Sweep, 2: ECCM Jamming Overrides
-        self.processing_load = 0.12        # Initial algorithmic core load representation
-
-        # Tactical Target Profiles (Kinematic Matrix Arrays)
-        self.targets = []
+        # Operational Control Coordinates
         self.radar_angle = 0.0
-        self.generate_live_threats()
-
-        # Telemetry Cache Buffer (Pre-allocated NumPy array for fast operations)
-        self.core_temp = 39.5
-        self.temp_buffer = np.full(60, 39.5, dtype=np.float32)
-
-        # Pre-allocated 1D spatial matrix for high-speed vectorized waveform rendering
-        self.x_axis_vector = np.arange(548, dtype=np.int32)
-
-    def generate_live_threats(self):
-        """Generates mock dynamic threat targets within the virtual processing matrix"""
         self.targets = []
-        for i in range(3):
+        self.detected_targets = {}  # Tracks continuous unique rows dynamically
+        self.init_dynamic_threat_environment()
+
+        # Telemetry Cache Buffers
+        self.system_load_buffer = np.full(60, 14.0, dtype=np.float32)
+        self.core_temp_buffer = np.full(60, 43.4, dtype=np.float32)
+        
+        # High-speed Vectorized NumPy wave array
+        self.ew_x_vector = np.arange(550, dtype=np.int32)
+        self.jamming_active = False
+
+    def init_dynamic_threat_environment(self):
+        """Generates raw kinematic vectors securely locked inside the radar center boundary"""
+        rx, ry, r_max = 320, 535, 125  # Geometric bounds of the radar circle
+        
+        # Defining 5 unique system tracking blocks
+        target_specs = [
+            {"id": "TGT-01", "type": "MISSILE VECTOR"},
+            {"id": "TGT-02", "type": "LOW-ALT UAV"},
+            {"id": "TGT-03", "type": "STEALTH THREAT"},
+            {"id": "TGT-04", "type": "FIGHTER JET"},
+            {"id": "TGT-05", "type": "DECOY SIGNALS"}
+        ]
+        
+        self.targets = []
+        for spec in target_specs:
+            random_radius = random.uniform(20, r_max - 22)
+            random_angle = random.uniform(0, 2 * math.pi)
+            
             self.targets.append({
-                "id": f"THREAT_0{i+1}",
-                "x": float(random.randint(240, 460)),
-                "y": float(random.randint(220, 500)),
-                "speed_x": random.uniform(-1.4, 1.4),
-                "speed_y": random.uniform(-1.4, 1.4),
-                "rCS": random.uniform(0.15, 2.5)   # Radar Cross Section in square meters
+                "id": spec["id"],
+                "type": spec["type"],
+                "radius": random_radius,
+                "angle": random_angle,
+                "radial_speed": random.uniform(0.003, 0.009),
+                "base_velocity": random.uniform(220, 1100),
+                "rcs_val": random.uniform(0.05, 2.2)
             })
 
-    def draw_tactical_hud(self, canvas, current_routine):
-        """Renders an advanced, crystal-clear glass telemetry header"""
-        # Top banner background block
-        cv2.rectangle(canvas, (0, 0), (self.width, 60), (10, 10, 12), -1)
-        # Tactical separating boundary orange line
-        cv2.line(canvas, (0, 60), (self.width, 60), (255, 120, 0), 1) 
-        
-        # Microsecond precision delta time computation for real-time FPS
-        current_time = time.time()
-        dt = current_time - self.last_time
-        self.last_time = current_time
-        raw_fps = 1.0 / dt if dt > 0 else 60.0
-        self.fps = 0.9 * self.fps + 0.1 * raw_fps
+    def draw_structured_panel(self, canvas, title, pt1, pt2, accent_color=(255, 120, 0)):
+        """Renders isolated operational bounding panels to eliminate string overlap"""
+        cv2.rectangle(canvas, pt1, pt2, (10, 12, 16), -1)
+        cv2.rectangle(canvas, pt1, pt2, (45, 48, 55), 1)
+        cv2.rectangle(canvas, pt1, (pt2[0], pt1[1] + 28), (20, 24, 32), -1)
+        cv2.line(canvas, (pt1[0], pt1[1] + 28), (pt2[0], pt1[1] + 28), accent_color, 1)
+        cv2.putText(canvas, title, (pt1[0] + 12, pt1[1] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (240, 240, 245), 1, cv2.LINE_AA)
 
-        # Top Overlay text indicators
-        cv2.putText(canvas, f"INDIGENOUS DEFENCE SYSTEM // {current_routine}", (25, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 2, cv2.LINE_AA)
-        cv2.putText(canvas, f"COMPUTE ENGINE: NUMPY VECTORIZED | PROCESSOR: INTEL i7 CORE | SYSTEM FPS: {self.fps:.1f}", (self.width - 775, 36), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.68, (0, 255, 0), 1, cv2.LINE_AA)
+    def update_hardware_telemetry(self):
+        """Updates internal telemetry buffers using vectorized microshifts"""
+        base_load = 68.0 if self.jamming_active else 14.0
+        base_temp = 57.5 if self.jamming_active else 43.4
+        
+        current_load = np.clip(base_load + random.uniform(-3.0, 3.0), 0, 100)
+        current_temp = np.clip(base_temp + random.uniform(-0.5, 0.5), 30, 90)
 
-    def draw_thermal_telemetry(self, canvas):
-        """Vectorized system thermal tracker utilizing advanced roll processing shifts"""
-        target_temp = 39.5 + (self.processing_load * 26.5)
-        self.core_temp = 0.94 * self.core_temp + 0.06 * target_temp
+        self.system_load_buffer = np.roll(self.system_load_buffer, -1)
+        self.core_temp_buffer = np.roll(self.core_temp_buffer, -1)
         
-        # Vectorized memory block shift operation (Replaces slow python pop/append execution threads)
-        self.temp_buffer = np.roll(self.temp_buffer, -1)
-        self.temp_buffer[-1] = self.core_temp
-
-        # Base boundary card overlay for telemetry graph
-        gx, gy = self.width - 260, self.height - 190
-        cv2.rectangle(canvas, (gx, gy), (gx + 240, gy + 170), (12, 12, 15), -1)
-        cv2.rectangle(canvas, (gx, gy), (gx + 240, gy + 170), (45, 45, 50), 1)
-        
-        # Telemetry matrix metrics text strings
-        cv2.putText(canvas, f"ALGO LOAD INDICES: {int(self.processing_load * 100)}%", (gx + 15, gy + 25), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.65, (0, 255, 255), 1, cv2.LINE_AA)
-        cv2.putText(canvas, f"CORE TEMPERATURE: {self.core_temp:.1f} C", (gx + 15, gy + 48), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.65, (255, 255, 255), 1, cv2.LINE_AA)
-        
-        # Drawing dynamic performance history telemetry plot
-        for i in range(len(self.temp_buffer) - 1):
-            x1 = int(gx + 15 + (i * 3.5))
-            y1 = int(gy + 145 - (self.temp_buffer[i] - 35) * 4)
-            x2 = int(gx + 15 + ((i + 1) * 3.5))
-            y2 = int(gy + 145 - (self.temp_buffer[i+1] - 35) * 4)
-            y1, y2 = np.clip([y1, y2], gy + 65, gy + 160)
-            
-            graph_color = (0, 255, 0) if self.ew_mode == 1 else (0, 0, 255)
-            cv2.line(canvas, (x1, y1), (x2, y2), graph_color, 1, cv2.LINE_AA)
+        self.system_load_buffer[-1] = current_load
+        self.core_temp_buffer[-1] = current_temp
 
     def launch_mission_suite(self):
-        """Initializes standalone graphical environment and triggers tactical computational pipelines"""
-        window_matrix = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-        cv2.namedWindow("DRDO TACTICAL RADAR MISSION DASHBOARD")
-
+        """Launches the unified multi-panel DRDO dashboard interface"""
+        cv2.namedWindow("DRDO TACTICAL RADAR MISSION DASHBOARD", cv2.WINDOW_AUTOSIZE)
+        
         while True:
-            canvas = window_matrix.copy()
+            canvas = np.full((self.height, self.width, 3), 5, dtype=np.uint8)
             
-            # Rendering Industrial structural network grid backgrounds
-            for i in range(0, self.width, 60):
-                cv2.line(canvas, (i, 60), (i, self.height), (14, 14, 18), 1)
-            for j in range(60, self.height, 60):
-                cv2.line(canvas, (0, j), (self.width, j), (14, 14, 18), 1)
+            # --- TOP LEVEL TELEMETRY HEADER ---
+            current_time = time.time()
+            dt = current_time - self.last_time
+            self.last_time = current_time
+            self.fps = 0.9 * self.fps + 0.1 * (1.0 / dt if dt > 0 else 60.0)
+            
+            cv2.rectangle(canvas, (0, 0), (self.width, 40), (12, 14, 18), -1)
+            cv2.putText(canvas, "DRDO TACTICAL MISSION CONTROL ENGINE", (25, 26), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
+            cv2.putText(canvas, f"HARDWARE LOG: INTEL i7 CORE | SYSTEM FPS: {self.fps:.1f}", (self.width - 450, 25), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.65, (0, 255, 0), 1, cv2.LINE_AA)
+            cv2.line(canvas, (0, 40), (self.width, 40), (0, 255, 0), 1)
 
             # =================================================================
-            # 📡 ROUTINE 1: PHASED-ARRAY SYSTEM SEARCH & RADAR MONITOR
+            # PANEL 2: PHASED-ARRAY RADAR SURVEILLANCE SCOPE (LIGHT BLUE COLOR)
             # =================================================================
-            if self.ew_mode == 1:
-                self.draw_tactical_hud(canvas, "PHASED-ARRAY RADAR AIRSPACE SEARCH")
-                self.processing_load = 0.14
-                
-                rx, ry, radius = 350, 360, 210
-                cv2.circle(canvas, (rx, ry), radius, (10, 28, 10), -1)
-                cv2.circle(canvas, (rx, ry), radius, (0, 180, 0), 1, cv2.LINE_AA)
-                cv2.circle(canvas, (rx, ry), radius - 70, (0, 90, 0), 1, cv2.LINE_AA)
-                cv2.circle(canvas, (rx, ry), radius - 140, (0, 90, 0), 1, cv2.LINE_AA)
-                
-                # Trigonometric angular shift for Phased radar sweeping beam simulation
-                self.radar_angle += 0.03
-                sweep_x = int(rx + radius * math.cos(self.radar_angle))
-                sweep_y = int(ry + radius * math.sin(self.radar_angle))
-                cv2.line(canvas, (rx, ry), (sweep_x, sweep_y), (0, 255, 60), 2, cv2.LINE_AA)
+            # Light Blue / Cyan Palette definitions BGR format
+            light_blue_panel = (255, 200, 60)
+            light_blue_grid = (200, 140, 20)
+            
+            self.draw_structured_panel(canvas, "INDIGENOUS RADAR LIVE SURVEILLANCE MAP", (20, 380), (620, 670), light_blue_panel)
+            
+            rx, ry, r_max = 320, 535, 125
+            cv2.circle(canvas, (rx, ry), r_max, (24, 18, 5), -1) # Dark Blue tint background
+            for r_step in [r_max, int(r_max * 0.66), int(r_max * 0.33)]:
+                cv2.circle(canvas, (rx, ry), r_step, light_blue_grid, 1, cv2.LINE_AA)
+            
+            # Sweeping beam tracking updates using Light Blue vector line
+            self.radar_angle = (self.radar_angle + 0.04) % (2 * math.pi)
+            sweep_x = int(rx + r_max * math.cos(self.radar_angle))
+            sweep_y = int(ry + r_max * math.sin(self.radar_angle))
+            cv2.line(canvas, (rx, ry), (sweep_x, sweep_y), light_blue_panel, 2, cv2.LINE_AA)
 
-                # Process Kinetic Threat Tracker Node Array
-                for target in self.targets:
-                    target["x"] += target["speed_x"]
-                    target["y"] += target["speed_y"]
+            # Process target kinematics ONLY if Jammer Network Attack is Active (Key 2)
+            if self.jamming_active:
+                for tgt in self.targets:
+                    tgt['angle'] = (tgt['angle'] + tgt['radial_speed']) % (2 * math.pi)
+                    tx = int(rx + tgt['radius'] * math.cos(tgt['angle']))
+                    ty = int(ry + tgt['radius'] * math.sin(tgt['angle']))
                     
-                    # Boundary collision checking via Euclidean distance geometry calculations
-                    dist_vector = math.sqrt((target["x"] - rx)**2 + (target["y"] - ry)**2)
-                    if dist_vector > (radius - 15):
-                        target["speed_x"] *= -1
-                        target["speed_y"] *= -1
-
-                    tx, ty = int(target["x"]), int(target["y"])
-                    # Anti-aliased target square tracking markers
-                    cv2.rectangle(canvas, (tx - 8, ty - 8), (tx + 8, ty + 8), (0, 0, 255), 1, cv2.LINE_AA)
-                    cv2.putText(canvas, f"{target['id']} // RCS: {target['rCS']:.2f} m^2", (tx - 50, ty - 16), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.55, (240, 240, 245), 1, cv2.LINE_AA)
+                    live_range = int(tgt['radius'] * 5.5) + random.randint(-1, 1)
+                    live_vel = int(tgt['base_velocity'] + random.uniform(-4.0, 4.0))
+                    
+                    angle_diff = abs(self.radar_angle - tgt['angle'])
+                    if angle_diff < 0.12:  
+                        self.detected_targets[tgt['id']] = {
+                            "type": tgt['type'],
+                            "range": live_range,
+                            "velocity": live_vel,
+                            "rcs": tgt['rcs_val']
+                        }
+                    
+                    # Render red threat blips inside the scope
+                    cv2.rectangle(canvas, (tx - 5, ty - 5), (tx + 5, ty + 5), (0, 0, 255), -1)
+                    cv2.putText(canvas, f"{tgt['id']}", (tx + 8, ty + 4), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.5, (0, 255, 255), 1, cv2.LINE_AA)
+            else:
+                # Clear logged entries when jammer network turns off
+                self.detected_targets.clear()
 
             # =================================================================
-            # ⚡ ROUTINE 2: ELECTRONIC WARFARE SPECTRA OVERRIDES (ECCM ACTIVE)
+            # PANEL 1: MISSION BRIEFING & PERMANENT DYNAMIC LOGS (TOP LEFT)
             # =================================================================
-            elif self.ew_mode == 2:
-                self.draw_tactical_hud(canvas, "ELECTRONIC COUNTER-COUNTER MEASURES (ECCM)")
-                self.processing_load = 0.68  # Emulating algorithm sorting stream calculation weights
-                
-                ox, oy = 60, 220
-                cv2.putText(canvas, "ADVERSARIAL ELECTRONIC JAMMING SPECTRUM ATTACK (NOISE MATRIX):", (ox, oy - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 1, cv2.LINE_AA)
-                
-                # --- HIGH-SPEED VECTORIZED NUMPY MATRIX FREQUENCY COMPUTATION ---
-                # Compiling 548 waveform coordinate transformations in a single microsecond clock cycle
-                t_step = time.time() * 24.0
-                hostile_y_vector = (oy + 60 + np.sin(self.x_axis_vector * 0.12 + t_step) * 40 + np.sin(self.x_axis_vector * 0.35) * 6).astype(np.int32)
-                
-                # Dynamic matrix shape stacking mapping vectors
-                points_hostile = np.column_stack((ox + self.x_axis_vector, hostile_y_vector))
-                cv2.polylines(canvas, [points_hostile], False, (0, 0, 255), 1, cv2.LINE_AA)
+            self.draw_structured_panel(canvas, "MISSION BRIEFING & TARGET VECTORS", (20, 60), (620, 360))
+            
+            cv2.putText(canvas, "MISSION BRIEFING: ACTIVE SURVEILLANCE OF STRATEGIC AIRSPACE SECTOR 4.", (35, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 205), 1, cv2.LINE_AA)
+            cv2.putText(canvas, f"CURRENT THREATS: ({len(self.detected_targets)} ACTIVE TARGET TRACKS REGISTERED)", (35, 132), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (0, 255, 255), 1, cv2.LINE_AA)
+            
+            # Print row logs (Will remain empty during standby state)
+            start_y = 165
+            for idx, (t_id, metrics) in enumerate(sorted(self.detected_targets.items())):
+                log_line = f"| {t_id}: {metrics['type']} | RANGE: {metrics['range']}KM | VEL: {metrics['velocity']}M/S | RCS: {metrics['rcs']:.2f}M2"
+                cv2.putText(canvas, log_line, (32, start_y + (idx * 24)), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.52, (240, 240, 245), 1, cv2.LINE_AA)
 
-                # Real-Time Filtered Clean ECCM Wave Rendering Output
-                oy_eccm = 420
-                cv2.putText(canvas, "AUTONOMOUS RE-ROUTED INDIGENOUS ANTI-JAMMING SECURE SPECTRUM:", (ox, oy_eccm - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 1, cv2.LINE_AA)
-                
-                clean_t = time.time() * 8.0
-                clean_y_vector = (oy_eccm + 60 + np.sin(self.x_axis_vector * 0.04 + clean_t) * 32).astype(np.int32)
-                
-                points_clean = np.column_stack((ox + self.x_axis_vector, clean_y_vector))
-                cv2.polylines(canvas, [points_clean], False, (0, 255, 0), 2, cv2.LINE_AA)
+            # =================================================================
+            # PANEL 3: LIVE HARDWARE TELEMETRY GRAPH (BOTTOM CENTER BLOCK)
+            # =================================================================
+            self.draw_structured_panel(canvas, "LIVE HARDWARE TELEMETRY LOGS", (640, 380), (1260, 670))
+            self.update_hardware_telemetry()
+            
+            gx, gy = 660, 430
+            cv2.putText(canvas, f"SYSTEM LOAD: {self.system_load_buffer[-1]:.1f}%", (gx, gy), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.65, (0, 255, 255), 1, cv2.LINE_AA)
+            cv2.putText(canvas, f"CORE TEMPERATURE: {self.core_temp_buffer[-1]:.1f} C", (gx + 260, gy), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.65, (255, 255, 255), 1, cv2.LINE_AA)
+            
+            cv2.line(canvas, (gx, gy + 190), (gx + 540, gy + 190), (150, 150, 150), 1) 
+            cv2.line(canvas, (gx, gy + 30), (gx, gy + 190), (150, 150, 150), 1) 
+            cv2.putText(canvas, "TIME (S)", (gx + 240, gy + 210), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.5, (120, 120, 125), 1, cv2.LINE_AA)
+            
+            for k in range(len(self.system_load_buffer) - 1):
+                x1_val = int(gx + (k * 9.0))
+                y1_val = int(gy + 190 - (self.system_load_buffer[k] * 1.5))
+                x2_val = int(gx + ((k + 1) * 9.0))
+                y2_val = int(gy + 190 - (self.system_load_buffer[k+1] * 1.5))
+                cv2.line(canvas, (x1_val, y1_val), (x2_val, y2_val), (255, 200, 0), 1, cv2.LINE_AA)
 
-            # --- MISSION STATUS PANEL LOGGER BOX ---
-            cv2.rectangle(canvas, (30, self.height - 140), (680, self.height - 40), (10, 10, 12), -1)
-            cv2.rectangle(canvas, (30, self.height - 140), (680, self.height - 40), (50, 50, 55), 1)
-            cv2.putText(canvas, f"TACTICAL INFRASTRUCTURE ONLINE // SYSTEM REGISTERS: ENFORCED", (45, self.height - 105), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (240, 240, 245), 1, cv2.LINE_AA)
-            cv2.putText(canvas, f"THREAT METRICS EVALUATION PROTECTION STATE: [ {self.system_status} ]", (45, self.height - 65), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.65, self.hud_color, 1, cv2.LINE_AA)
+            # =================================================================
+            # PANEL 4: ELECTRONIC COUNTER-COUNTER MEASURES (EW SPECTRUM RIGHT)
+            # =================================================================
+            self.draw_structured_panel(canvas, "ELECTRONIC COUNTER-COUNTER MEASURES (ECCM)", (640, 60), (1260, 360), (0, 120, 255))
+            
+            wave_start_x = 680
+            if self.jamming_active:
+                cv2.putText(canvas, "RED WAVE: HOSTILE JAMMING ATTACK VECTOR (ACTIVE INTERFERENCE)", (660, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (0, 0, 255), 1, cv2.LINE_AA)
+                t_wave = time.time() * 25.0
+                hostile_y = (170 + np.sin(self.ew_x_vector * 0.15 + t_wave) * 30 + np.sin(self.ew_x_vector * 0.4) * 8).astype(np.int32)
+                pts_hostile = np.column_stack((wave_start_x + self.ew_x_vector, hostile_y))
+                cv2.polylines(canvas, [pts_hostile], False, (0, 0, 255), 1, cv2.LINE_AA)
+            else:
+                cv2.putText(canvas, "RED WAVE: SPECTRUM STATUS CLEAR (NO ACTIVE JAMMING IDENTIFIED)", (660, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (100, 100, 105), 1, cv2.LINE_AA)
+                cv2.line(canvas, (wave_start_x, 170), (wave_start_x + 550, 170), (40, 40, 45), 1, cv2.LINE_AA)
 
-            # Manual Operation User Interface Menu Map
-            cv2.rectangle(canvas, (self.width - 260, self.height - 310), (self.width - 20, self.height - 210), (10, 10, 12), -1)
-            cv2.putText(canvas, " OPERATIONAL MENU:", (self.width - 245, self.height - 285), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.65, (240, 240, 245), 1, cv2.LINE_AA)
-            cv2.putText(canvas, "[Key 1] : Phased Radar Search", (self.width - 245, self.height - 260), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (0, 255, 0), 1, cv2.LINE_AA)
-            cv2.putText(canvas, "[Key 2] : Inject Electronic Warfare", (self.width - 245, self.height - 235), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (0, 0, 255), 1, cv2.LINE_AA)
+            cv2.putText(canvas, "GREEN WAVE: AUTONOMOUS SECURE ECCM SPECTRUM COUNTER SIGNAL", (660, 245), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (0, 255, 0), 1, cv2.LINE_AA)
+            t_clean = time.time() * 10.0
+            clean_y = (295 + np.sin(self.ew_x_vector * 0.05 + t_clean) * 25).astype(np.int32)
+            pts_clean = np.column_stack((wave_start_x + self.ew_x_vector, clean_y))
+            cv2.polylines(canvas, [pts_clean], False, (0, 255, 0), 2, cv2.LINE_AA)
 
-            # Render hardware tracking statistics
-            self.draw_thermal_telemetry(canvas)
+            # --- LOWER BAR DASHBOARD INTERFACE CONTROLS ---
+            cv2.rectangle(canvas, (0, self.height - 35), (self.width, self.height), (12, 14, 18), -1)
+            cv2.putText(canvas, "[KEY 1]: RADAR SWEEP MODE | [KEY 2]: TRIGGER ELECTRONIC JAMMING & ECCM OVERRIDES | [Q]: TERMINATE SECURITY CORE", (25, self.height - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 205), 1, cv2.LINE_AA)
+            cv2.putText(canvas, "DEVELOPED BY: SK SOYEB AKHTAR", (self.width - 290, self.height - 12), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
 
-            # Update master application framework display frame
             cv2.imshow("DRDO TACTICAL RADAR MISSION DASHBOARD", canvas)
             
             key = cv2.waitKey(15) & 0xFF
             if key == ord('1'):
-                self.ew_mode = 1
-                self.system_status = "SCANNING TACTICAL AIRSPACE"
-                self.hud_color = (0, 255, 0)
-                self.generate_live_threats()
+                self.jamming_active = False
             elif key == ord('2'):
-                self.ew_mode = 2
-                self.system_status = "⚠️ JAMMING INTERFERENCE IMMINENT // INITIALIZING ECCM FILTER REGISTERS"
-                self.hud_color = (0, 0, 255)
-            elif key == ord('q'): 
+                self.jamming_active = True
+            elif key == ord('q'):
                 break
 
         cv2.destroyAllWindows()
